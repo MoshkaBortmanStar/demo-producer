@@ -1,0 +1,44 @@
+version: "3.8"
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    ports:
+      - "2181:2181"
+    networks:
+      - kafka-net
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+    depends_on:
+      - zookeeper
+    networks:
+      - kafka-net
+
+  quarkus-app:
+    build:
+      context: .
+      dockerfile: src/main/docker/Dockerfile.native-micro
+      platforms:
+        - linux/amd64
+    depends_on:
+      - kafka
+    environment:
+      mp.messaging.outgoing.jira-events.bootstrap.servers: kafka:29092
+    ports:
+      - "8080:8080"
+    networks:
+      - kafka-net
+
+
+networks:
+  kafka-net:
+    driver: bridge
